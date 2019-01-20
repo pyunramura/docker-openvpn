@@ -1,0 +1,3 @@
+#!/usr/bin/with-contenv sh
+  rm -f /var/run/openvpn/vpn_port
+  echo "Forwarded port removed"

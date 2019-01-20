@@ -1,0 +1,44 @@
+#!/usr/bin/with-contenv sh
+
+# Sets up a restrictive outbound ipv4 firewall only allowing traffic to one
+# destination (address, protocol, port, ip address). It is only a ipv4 firewall
+# because docker (17.10.0-ce) only supports ipv6 behind a flag.
+
+# Exit on first non-zero exit code like a sane language.
+set -e
+
+echo "[cont-init.d] 20-firewall: Initializing..."
+
+# List the local address range routed by the eth0 interface.
+hostname=$(route -n | grep "eth*" | grep 'UG[ \t]' | awk '{print $2}')
+interface=$(route -n | grep "eth*" | grep 'UG[ \t]' | awk '{print $8}')
+
+# Clear output table.
+iptables --flush OUTPUT
+
+# Drop unmatched traffic.
+iptables --policy OUTPUT DROP
+
+# Allows traffic corresponding to inbound traffic.
+iptables --append OUTPUT --match conntrack --ctstate ESTABLISHED,RELATED --jump ACCEPT
+
+# Accept traffic to the loopback interface.
+iptables --append OUTPUT --out-interface lo --jump ACCEPT
+
+# Accept traffic to tunnel interfaces.
+iptables --append OUTPUT --out-interface tap0 --jump ACCEPT
+iptables --append OUTPUT --out-interface tun+ --jump ACCEPT
+
+# Accept traffic to the domain name server (eg 1.1.1.1 8.8.8.8).
+iptables --append OUTPUT --protocol udp --match udp --dport 53 --jump ACCEPT
+
+# Accept traffic to the one allowed address.
+awk '/^[Rr]emote /{a=$2;b=$3;c=$4}/^[Pp]ort /{bz=$2}/^[Pp]roto /{cz=$2} \
+END{print a,b,c,bz,cz}' /config/client.ovpn | while read x y z ; do \
+iptables --append OUTPUT --destination $x --protocol $z --dport $y --jump ACCEPT \
+; done
+
+# Accept output for icmp (ping)
+iptables --append OUTPUT --protocol icmp --icmp-type echo-request --jump ACCEPT
+
+echo "[cont-init.d] 20-firewall: Initialized."
