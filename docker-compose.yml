@@ -1,0 +1,43 @@
+version: '3.3'
+services:
+    openvpn:
+        image: pyunramura/openvpn
+        cap_add:
+            - NET_ADMIN
+        devices:
+            - /dev/net/tun
+        container_name: openvpn
+        restart: always
+        volumes:
+            - vpn_port:/var/run/openvpn
+            - /path/to/ovpn/certs:/config
+        environment:
+            - LAN_NET=192.168.0.0/24
+        ports:
+            - "9091:9091"
+        networks:
+            - vpn_network
+    transmission:
+        image: pyunramura/transmission
+        container_name: transmission
+        restart: always
+        volumes:
+            - /path/to/transmission/config:/config
+            - /path/to/transmission/downloads:/downloads
+            - /path/to/watch/dir:/watch
+            - vpn_port:/var/run/openvpn:ro
+        environment:
+            - GID=1001
+            - UID=1001
+            - VPN=yes
+            - PORT_F=yes
+            - NEW_UI=yes
+        network_mode: service:openvpn
+        depends_on:
+            - openvpn
+networks:
+    vpn_network:
+        external:
+            name: "vpn_network"
+volumes:
+    vpn_port:

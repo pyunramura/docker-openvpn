@@ -17,6 +17,8 @@ It is based on Alpine Linux, a streamlined distribution tailored for Docker then
 
 The goal is to start this container first then run another container within the vpn container's network with `--net=container:openvpn`, or as part of a docker-compose stack with `network_mode: service:openvpn`.
 
+_NOTE:_ this container has only been tested on linux systems at time of writing.
+
 ## Usage Example with Transmission
 
 ```
@@ -25,7 +27,7 @@ docker run -d --rm \
 	--cap-add=NET_ADMIN \
 	--device /dev/net/tun \
 	--net=vpn_network \
-	-e LAN_NET=1.2.3.4\24 \
+	-e LAN=1.2.3.4\24 \
 	-v path/to/ovpn/config:/config \
 	-v vpn_port:/var/run/ovpn \
 	-p 9091:9091 \
@@ -43,12 +45,12 @@ So `-p 80:9091` would expose port 9091 from inside the container to be accessibl
   * `-p 9091` - the mapped port for the service(s) you wish to access, in this example transmission-web
   * `-v /config` - where openvpn will look for its ovpn configuration files at **`/config/client.ovpn`**
   * `-v vpn_port` - a docker volume for the the forwarded port for other containers that access the vpn tunnel
-  * `-e LAN_NET` - the local subnet you will be accessing services from; remote access is untested at time of writing
+  * `-e LAN` - the local subnet you will be accessing services from; remote access is untested at time of writing
 
 #### Notes from above
 * Due to the nature of the ovpn client, this container must be started with some additional privileges. `--cap-add=NET_ADMIN` makes sure that the tunnel can be created from within the container.
 
-* The `--device /dev/net/tun` command will allow the container access to your host's tunnel adapter. This could be automated, but would require unconfined privileges to your host which would go against the principal of least authority, and so is intentionally omitted.
+* The `--device /dev/net/tun` command will allow the container access to your host's tunnel adapter. This could be automated, but would require unconfined privileges to your host which is undesirable, and so is intentionally omitted. To check if your host has a tunnel adapter see the note below.
 
 * The `vpn_port` volume is made with `docker create volume vpn_port`. It is used by the service to announce the forwarded port to other containers behind the vpn tunnel. This is configured for private internet access servers that allow port forwarding; with additional providers planned for future releases. A current list an be found on their [client support page](https://www.privateinternetaccess.com/pages/client-support/) under *Port Forwarding*.
 
@@ -73,6 +75,9 @@ So `-p 80:9091` would expose port 9091 from inside the container to be accessibl
    `docker inspect -f '{{ index .Config.Labels "build_version" }}' pyunramura/openvpn`
 
 # Advanced usage
+
+## Make tunnel device on host
+Check if the host machine has a tunnel device with `ls /dev/net` and you will see `tun` if a tunnel device exists. If there is no tunnel device, copy the _make_tun.sh_ from my repository root onto your host machine and change into the directory it was copied to and `chmod +x make_tun.sh`, then `./make_tun.sh` to create the device. Verify that it has been given the proper attributes with `cat /dev/net/tun`. If it has been created successfully it will present a message such as `cat: /dev/net/tun: File descriptor in bad state`. Now you can run the container with the `--device /dev/net/tun` option to allow OpenVPN to create the tunnel inside the container.
 
 ## Connection between containers behind the vpn tunnel
 A container started with `--net=container:<vpn>` will use the same network stack as the `<vpn>` container, and will share the same container IP subnet. In addition with docker-compose the command would read `network_mode: service:<vpn>` to get the same result. A compose file is provided in the git repository for reference.
@@ -154,4 +159,3 @@ Otherwise you will see a output in the Docker logs similar to:
 ## Versions
 
 + **2.4.6-r3** Initial release.
-

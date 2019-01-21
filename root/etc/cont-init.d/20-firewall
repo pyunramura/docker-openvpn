@@ -9,15 +9,14 @@ set -e
 
 echo "[cont-init.d] 20-firewall: Initializing..."
 
-# List the local address range routed by the eth0 interface.
-hostname=$(route -n | grep "eth*" | grep 'UG[ \t]' | awk '{print $2}')
-interface=$(route -n | grep "eth*" | grep 'UG[ \t]' | awk '{print $8}')
-
 # Clear output table.
 iptables --flush OUTPUT
 
 # Drop unmatched traffic.
 iptables --policy OUTPUT DROP
+
+# Create route to local subnet to access services
+ip r l | awk '/.via.*eth./{print $3,$5}'|while read x y;do ip r a ${LAN} via $x dev $y;done
 
 # Allows traffic corresponding to inbound traffic.
 iptables --append OUTPUT --match conntrack --ctstate ESTABLISHED,RELATED --jump ACCEPT
